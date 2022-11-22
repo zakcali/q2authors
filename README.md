@@ -10,4 +10,6 @@ There are two types of outputs from https://github.com/zakcali/wos2q
 q2authors, reads type-2 of output of wos2q, and tries to split (distribute) journals to a specific institute, specified in addresslist.txt
 If it finds variant names of authors, tries to use only one name by usinf namedict.txt
 
-if it finds a listed institute name, but couldn't distribute to authors, then place an asterix to the first coulmn of output named NS
+if it finds a listed institute name, but couldn't distribute to authors, then place an asterix to the first column of output named NS
+
+example input contains 15 publications, but output contains 59 publications because some of the publications have more than one outhor from the specifie institution.

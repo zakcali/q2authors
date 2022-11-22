@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<!-- Bu yazılım Dr. Zafer Akçalı tarafından oluşturulmuştur -->
+<!-- Programmed by Zafer Akçalı, MD-->
+<!-- q2authors V1.7, imports output of wos2q, requires addreses and correspondence, outputs only relevant institute address-->
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Display Authors Quartiles of Web of Science Publications</title>
+    
+<!-- https://github.com/mholt/PapaParse-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.2.0/papaparse.min.js"></script>	
+<!-- // https://github.com/eligrey/FileSaver.js-->
+<script src="https://cdn.jsdelivr.net/g/filesaver.js"></script> 
+<script src="namedict.txt"></script>
+<script src="addresslist.txt"></script>
+</head>
+<body>
+
+<label for="myfile">Select a directly exported Full Content "Tab delimited file" from wos:</label>
+<input type="file" id="csvfile" name="Csv File">
+<button id="readBtn" onclick="readFunction()">Read</button> <br/><br/>
+Publications: <br/>
+<textarea rows = "30" cols = "120" name = "Publications" wrap="off" id="publicationsArea"></textarea> 
+<br/><label id = "infoTextFile" ></label> <label id = "infoTextOutput" ></label><br/>
+<button id="convBtn" onclick="convertFunction()">Convert</button> 	
+<button id="copyBtn" disabled onclick="copyFunction()">Copy</button>
+<button id="saveCsvBtn" disabled onclick="saveCsvFunction()">Save csv</button>
+&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;
+<br/>
+Document Types  <br/>
+WOS #
+<input type="text" name="WOSnumber" id="WOSnumber"> 
+<button id="gotoWOS" onclick="displayWOSdocument()">Show article</button>
+<button id="deleteWOSnumber" onclick="deleteWOSnumber()">Delete WOS #</button>
+<script>
+// global scope
+var authorArray = new Array ([]); // an array, which contains authors with their publication, a row in the output
+var author = new Array ([]); // a group of authors sharing same addresses
+var addressOfAuthor ='';
+var includeAddress=false;
+var	atLeastOneAddress=false;
+var nauthor=0;
+var csvtext="";
+var delimit='\t'; // =document.getElementById('delimitValue').value
+const parseError = 'Please check "Include addresses box" on wos2q tool'
+
+function deleteWOSnumber() {
+	document.getElementById('WOSnumber').value = "";
+}
+
+function displayWOSdocument() {
+var	w=document.getElementById('WOSnumber').value.replace("WOS:","").replace(" ","");
+	urlText = "https://www.webofscience.com/wos/woscc/full-record/"+"WOS:"+w;
+	window.open(urlText,"_blank");
+	}
+function readFunction() {
+document.getElementById('publicationsArea').value=''; // clear textarea
+document.getElementById('copyBtn').disabled = true;  // disable copy button
+document.getElementById('convBtn').disabled = true;  // disable convert button
+document.getElementById('saveCsvBtn').disabled = true;  // disable save button
+document.getElementById('readBtn').disabled = true;  // disable read button
+var file = document.getElementById('csvfile').files[0]; //get filename
+var reader = new FileReader(); // html5 
+	reader.onload = (function(file) {
+	return function(e) {
+	csvtext = this.result;	//read from csv file
+		document.getElementById('publicationsArea').value=csvtext; // show in textarea
+		document.getElementById('convBtn').disabled = false;  // enable convert button
+		document.getElementById('readBtn').disabled = false;  // enable read button
+		document.getElementById('infoTextFile').innerHTML = ''; // delete any previous information about row counts
+		document.getElementById('infoTextOutput').innerHTML = ''; // delete any previous information about row counts		
+           }
+		})(file);
+		reader.readAsText(file);
+}
+function convertFunction() {
+csvtext=document.getElementById('publicationsArea').value;
+if (csvtext.substr(0,2) == 'NS')
+		return; // already converted
+var pubtext='NS'+delimit+'Author name'+delimit+'Author address'+delimit+'Q/index'+delimit+'scie'+delimit+'ssci'+delimit+'ahci'+delimit+'esci'+delimit+'Method'+delimit+'Wos number'+delimit+'Doc type'+delimit+'Cited'+delimit+'Auth.#'+delimit+'p.Year'+delimit+'ea.Year'+delimit+'Year'+delimit+'Journal'+delimit+'Title'+delimit+'Doi'+delimit+'Vol.'+delimit+'Issue'+delimit+'Page.S'+delimit+'Page.E'+delimit+'Artic.Nr'+delimit+'Ref.style'+delimit+'PMID'+delimit+'wosL'+delimit+'doiL'+delimit+'PMIDL'+delimit+'Authors'+delimit+'RID'+delimit+'OID'+'\n';
+
+var pubArray= new Array ([]); // an array, which contains publications
+
+var addresses="";
+var department = "";
+nauthor = 0; // number of authors 
+document.getElementById('publicationsArea').value=""; // clear textarea
+document.getElementById('copyBtn').disabled = true;  // disable copy button
+document.getElementById('saveCsvBtn').disabled = true;  // disable save button
+document.getElementById('convBtn').disabled = true;  // disable convert button
+document.getElementById('readBtn').disabled = true;  // disable read button
+	results = Papa.parse(csvtext, {	//parse from csv text
+	header: true,
+	delimiter: delimit,  
+	fastMode: true,   // for not to delete quoted parts in "Aricle Title"
+	skipEmptyLines: true
+});
+nrows = results.data.length; // number of rows in csv file
+// console.log (nrows);
+document.getElementById('infoTextFile').innerHTML = 'Number of publications in the csv file = '+nrows+'.';
+// initialise every row of a multidimentional array
+for (var i=0; i<nrows; i++) {
+	pubArray.push([0]); // create rows of multidimentional array
+	pubArray[i][0]="0"; // initialise first member of the row
+ }
+for (var i=0; i<nrows; i++) { // for each publication
+	atLeastOneAddress = false;
+	wos = results.data[i]['Wos number'] //
+	reprintAddress=results.data[i]['Correspondence']//['Reprint Addresses'];
+		
+	documentType=results.data[i]['Doc type']//['Document Type']
+
+	weird = '' // assume each article in shape of normal address format and author format
+
+	addresses = results.data[i]['Addresses'] //Addresses // deal with this text
+	if (addresses === undefined ) {
+	document.getElementById('publicationsArea').value = parseError;
+	return;
+	}
+	if (addresses == '') { // if Addresses field is empty
+		addresses = '[' + results.data[i]['Authors'] + '] ' +'Unknown'; // ['Authors']
+		weird = '*'  // check output 
+		}
+	if (addresses.indexOf("[")==-1) { // if Addresses field doesn't contain names
+
+		tempAuthor = results.data[i]['Authors'].replace(/;/g, ' -') // regexp for all // ['Authors']
+			// print only relevant (home institute) addresses
+		allAdresses = addresses.split(";")
+		tempAddresses = ""
+		for (c=0; c<allAdresses.length; c++) {
+			for (d=0; d<addressList.length;d++) {
+				if (allAdresses[c].toLowerCase().includes(addressList[d].toLowerCase())) { // a relevant address (home institute) 
+					tempAddresses = tempAddresses + allAdresses[c].trim() + " - ";
+				}
+			}
+		}
+		tempAddresses = tempAddresses.slice (0, -3); // remove last " - "
+	//	tempAddresses = addresses.replace(/;/g, '-') //regexp for all
+		weird = '*'  // someting weird in Addresses column, check them by marking with (*)
+		addresses = '['+tempAuthor+'] '+ tempAddresses
+		}
+	if (addresses.substring(0,1) != '[' ) {// if Addresses field doesn't start with [
+		addresses ='[unknown] ' + addresses
+		weird = '*' // someting weird in Addresses column, check them by marking with (*)
+		}
+	authors = addresses.slice(1).split("; [") //delete [, then go to first author of next address
+	
+	for (j=0;j<authors.length;j++) { // for each address
+	department = authors[j].split ("] ") // department[0] contains authors, department[1] contains address
+	author = department[0].split ("; ") // 
+	includeAddress=false;
+	if (department[1] === undefined) {
+	department[1] = addressList[0]+'?';  // one of authors seems to be in address list
+	weird = '*'; // someting weird in Addresses column, check them by marking with (*)
+	}
+	addressOfAuthor=department[1];
+	for (d=0; d<addressList.length;d++) {
+	if (addressOfAuthor.toLowerCase().includes(addressList[d].toLowerCase())) { //department[1] contains current address 
+			includeAddress = true; // current address is in the addresses list, a relevant (home) institute
+			break;}
+	}
+	if (includeAddress) {
+	atLeastOneAddress=true;
+	addRow();
+		}	
+	} // for each address
+	if ((atLeastOneAddress == false) && (reprintAddress !=='') ) { // didn't find a suitable address, check for reprint Address
+		for (d=0; d<addressList.length;d++)
+			if (reprintAddress.toLowerCase().includes(addressList[d].toLowerCase())) {
+				let reprintArray = reprintAddress.split(' (corresponding author), ')
+				addressOfAuthor = reprintArray[1];
+				author[0]=reprintArray[0];
+				author.length=1;
+				includeAddress = true;
+//				console.log(wos)
+//				console.log (reprintArray)
+				addRow();
+				}
+			}	
+} // for each publication
+function addRow () { // if Address is in the Addresses list
+		for (k=0;k<author.length;k++) { // for each author
+//			if (author[k] === '')		{
+//				break; }	// skip creating an author named ''
+			authorArray.push ([0]); // create rows of multidimentional array
+			for (var c=0; c<nameDict.length; c+=2) { // first item to last item
+				if ( author[k]==nameDict[c]) {  // if author name is misspelled, then correct it
+					author[k]=nameDict[c+1] 
+					break; } // don't continue to search 
+				}
+				pubtext = pubtext+weird
+				+delimit+"\""+author[k] +"\""  // name of author
+				+delimit+"\""+addressOfAuthor+"\"" // address of author
+				+delimit+results.data[i]['Q/index']
+				+delimit+results.data[i]['scie']
+				+delimit+results.data[i]['ssci']
+				+delimit+results.data[i]['ahci']
+				+delimit+results.data[i]['esci']
+				+delimit+results.data[i]['Method']
+				+delimit+results.data[i]['Wos number']
+				+delimit+results.data[i]['Doc type']
+				+delimit+results.data[i]['Cited']
+				+delimit+results.data[i]['Auth.#']
+				+delimit+results.data[i]['p.Year']
+				+delimit+results.data[i]['ea.Year']
+				+delimit+results.data[i]['Year']
+				+delimit+results.data[i]['Journal']
+				+delimit+results.data[i]['Title']
+				+delimit+results.data[i]['Doi']
+				+delimit+results.data[i]['Vol.']
+				+delimit+results.data[i]['Issue']
+				+delimit+results.data[i]['Page.S']
+				+delimit+results.data[i]['Page.E']
+				+delimit+results.data[i]['Artic.Nr']
+				+delimit+results.data[i]['Ref.style']
+				+delimit+results.data[i]['PMID']				
+				+delimit+results.data[i]['wosL']
+				+delimit+results.data[i]['doiL']
+				+delimit+results.data[i]['PMIDL']	
+				+delimit+results.data[i]['Authors']
+				+delimit+results.data[i]['RID']
+				+delimit+results.data[i]['OID']
+				+'\n';
+// console.log (pubtext);
+			nauthor++;
+			}
+} // if Address is in the Addresses list
+
+document.getElementById('publicationsArea').value=pubtext;
+document.getElementById('copyBtn').disabled = false; // enable copy button
+document.getElementById('saveCsvBtn').disabled = false;  // enable save button
+document.getElementById('convBtn').disabled = false;  // enable convert button
+document.getElementById('readBtn').disabled = false;  // enable read button
+document.getElementById('infoTextOutput').innerHTML = 'Number of authors/publications in output = '+nauthor+'.';
+}
+function copyFunction() {
+	document.getElementById('publicationsArea').select();
+	document.execCommand("copy");
+	document.getElementById('convBtn').disabled = false;  // enable convert button
+}
+function saveCsvFunction() {
+var blob = new Blob([document.getElementById('publicationsArea').value],
+                { type: "text/plain;charset=utf-8" });
+saveAs(blob, "output.csv");
+	document.getElementById('convBtn').disabled = false;  // enable convert button
+}
+</script>
+</body>
+</html>

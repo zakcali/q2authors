@@ -1,0 +1,3 @@
+let addressList= [
+"baskent univ", "bakent univ", "basket univ", "univ baskent", "baskent hosp"
+];

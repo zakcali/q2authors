@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- Bu yazılım Dr. Zafer Akçalı tarafından oluşturulmuştur -->
 <!-- Programmed by Zafer Akçalı, MD-->
-<!-- q2authors V1.9, imports output of wos2q, requires addreses and correspondence, outputs only relevant institute address-->
+<!-- q2authors V2.2, imports output of wos2q, requires addreses and correspondence, outputs only relevant institute address, 
+added $ISTP,$ISSHP,$BSCI,$BHCI,isbn,$pubType, $publisher, $bookDoi-->
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
@@ -77,7 +78,7 @@ function convertFunction() {
 csvtext=document.getElementById('publicationsArea').value;
 if (csvtext.substr(0,2) == 'NS')
 		return; // already converted
-var pubtext='NS'+delimit+'Author name'+delimit+'Author address'+delimit+'Q/index'+delimit+'scie'+delimit+'ssci'+delimit+'ahci'+delimit+'esci'+delimit+'Method'+delimit+'Wos number'+delimit+'Doc type'+delimit+'Cited'+delimit+'Auth.#'+delimit+'p.Year'+delimit+'ea.Year'+delimit+'Year'+delimit+'Journal'+'issn'+'eissn'+delimit+'Title'+delimit+'Doi'+delimit+'Vol.'+delimit+'Issue'+delimit+'Page.S'+delimit+'Page.E'+delimit+'Artic.Nr'+delimit+'Ref.style'+delimit+'PMID'+delimit+'wosL'+delimit+'doiL'+delimit+'PMIDL'+delimit+'Authors'+delimit+'RID'+delimit+'OID'+'\n';
+var pubtext='NS'+delimit+'Author name'+delimit+'Author address'+delimit+'Q'+delimit+'scie'+delimit+'ssci'+delimit+'ahci'+delimit+'esci'+delimit+'istp'+delimit+'isshp'+delimit+'bsci'+delimit+'bhci'+delimit+'Method'+delimit+'Wos number'+delimit+'Doc type'+delimit+'Cited'+delimit+'Auth.#'+delimit+'p.Year'+delimit+'ea.Year'+delimit+'Year'+delimit+'Journal'+delimit+'issn'+delimit+'eissn'+delimit+'isbn'+delimit+'Title'+delimit+'Doi'+delimit+'Vol.'+delimit+'Issue'+delimit+'Page.S'+delimit+'Page.E'+delimit+'Artic.Nr'+delimit+'Ref.style'+delimit+'PMID'+delimit+'Pub type'+delimit+'Publisher'+delimit+'Book doi'+delimit+'wosL'+delimit+'doiL'+delimit+'PMIDL'+delimit+'Authors'+delimit+'RID'+delimit+'OID'+'\n';
 
 var pubArray= new Array ([]); // an array, which contains publications
 
@@ -191,11 +192,15 @@ function addRow () { // if Address is in the Addresses list
 				pubtext = pubtext+weird
 				+delimit+"\""+author[k] +"\""  // name of author
 				+delimit+"\""+addressOfAuthor+"\"" // address of author
-				+delimit+results.data[i]['Q/index']
+				+delimit+results.data[i]['Q']
 				+delimit+results.data[i]['scie']
 				+delimit+results.data[i]['ssci']
 				+delimit+results.data[i]['ahci']
 				+delimit+results.data[i]['esci']
+				+delimit+results.data[i]['istp']
+				+delimit+results.data[i]['isshp']
+				+delimit+results.data[i]['bsci']
+				+delimit+results.data[i]['bhci']
 				+delimit+results.data[i]['Method']
 				+delimit+results.data[i]['Wos number']
 				+delimit+results.data[i]['Doc type']
@@ -207,6 +212,7 @@ function addRow () { // if Address is in the Addresses list
 				+delimit+results.data[i]['Journal']
 				+delimit+results.data[i]['issn']
 				+delimit+results.data[i]['eissn']
+				+delimit+results.data[i]['isbn']
 				+delimit+results.data[i]['Title']
 				+delimit+results.data[i]['Doi']
 				+delimit+results.data[i]['Vol.']
@@ -215,7 +221,10 @@ function addRow () { // if Address is in the Addresses list
 				+delimit+results.data[i]['Page.E']
 				+delimit+results.data[i]['Artic.Nr']
 				+delimit+results.data[i]['Ref.style']
-				+delimit+results.data[i]['PMID']				
+				+delimit+results.data[i]['PMID']	
+				+delimit+results.data[i]['Pub type']
+				+delimit+results.data[i]['Publisher']
+				+delimit+results.data[i]['Book doi']				
 				+delimit+results.data[i]['wosL']
 				+delimit+results.data[i]['doiL']
 				+delimit+results.data[i]['PMIDL']	

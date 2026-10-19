@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<!-- Bu yazılım Dr. Zafer Akçalı tarafından oluşturulmuştur -->
+<!-- Programmed by Zafer Akçalı, MD-->
+<!-- q2authors V2.3, namedict.js pairs are now "Correct name","Variation" (reversed from V2.2),
+ imports output of wos2q, requires addreses and correspondence, outputs only relevant institute address, 
+added $ISTP,$ISSHP,$BSCI,$BHCI,isbn,$pubType, $publisher, $bookDoi-->
+<!-- q2authors V3,
+ data files renamed .txt -> .js (addresslist.js, namedict.js), so a server sending
+   X-Content-Type-Options: nosniff cannot refuse to execute them,
+ duplicate author rows removed: wos repeats an author, or a whole [authors] address group,
+   inside one record. de-duplicated on corrected name + address, per publication,
+ parse error ("Include addresses" not ticked on wos2q) no longer leaves Read and Convert
+   disabled, the user had to reload the page,
+ new excludednames.js, drops listed authors from the output,
+ new excludeddepts.js, holds excludedDepartments and protectedNames. departments are matched
+   case insensitively anywhere in a home institute address, and only in the segments that match
+   addresslist.js, so another university's department is never excluded,
+ dental entries match the DEPARTMENT, never "Fac Dent". wos prints "Fac Dent" on some medical
+   records (Fac Dent, Dept Thorac Surg) and "Fac Med" on some dental ones (Fac Med, Dept Periodontol),
+ protectedNames keeps medical faculty attending a Ph.D. at Inst Hlth Sci,
+ the name and department filters skip rows marked (*) in the NS column, a weird row may carry
+   a wrong name or address so excluding it could be a mistake. the duplicate filter does not
+   skip them, an exact repeat carries no information whether the row is weird or not,
+ new "Save dropped departments" button writes dropped-departments.csv, same 42 columns as the
+   output, for manual review. no such list for excludednames.js,
+ the output row is now built once and routed to either output or the dropped list,
+ every case conversion goes through lower(), and a load time check fails loudly if it turns out
+   to be locale sensitive. a turkish locale maps I to the dotless i, which would silently stop
+   "Baskent Univ, Inst Hlth Sci" matching. one place to fix if this is ever ported-->
+<!-- q2authors V3.1,
+ correspondence fallback parses every "Name (corresponding author), Address" pair. before, it took
+   the text after the first tag, so a second corresponding author (or the same author listed twice)
+   leaked into the address: "Katip Celebi Univ, ...; Akan, O" instead of the Baskent address,
+ correspondence without the "(corresponding author)" tag no longer crashes Convert,
+ an address matching several addresslist.js entries yields one row, not one per entry,
+ Read with no file selected no longer leaves every button disabled,
+ home institute test moved to isHomeAddress(), unused arrays and implicit globals removed-->
+<!-- new "Save dropped names" button writes dropped-names.csv, rows dropped by excludednames.js, same 42
+   columns as the output, for manual review. the duplicate test now runs before the name test, so a
+   repeated excluded author is counted once as excluded and then as a duplicate, like any other row.
+   output.csv is unchanged by this-->
+<!-- every output field is now quoted, with inner quotes doubled (RFC 4180). before, only name and address
+   were quoted, so a title starting with a quote ("Further studies are needed": ...) made excel merge rows
+   and shift columns. the header and the row are built from one field list. saved files start with a
+   UTF-8 BOM, so excel reads turkish characters correctly. saveAs gets true as its third argument,
+   FileSaver 1.x adds its own BOM to utf-8 text blobs, which would make two-->
+<!-- an author keeps one row per publication: wos lists some authors with two or three home addresses
+   (Fac Med + Burn Ctr, Ankara + Adana), the first row is kept and the others are dropped, the address is
+   not compared. only rows that reach the output count, so an author whose first address is in
+   excludeddepts.js still keeps the valid row. '*' rows are never dropped this way, their name may be
+   wrong. new "Save dropped addresses" button writes dropped-addresses.csv: every kept and dropped row of such
+   an author, sorted by name and wos number, with Group and Action (kept/removed) columns in front.
+   distinct wos counts per author do not change, only the row count-->
+
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Display Authors Quartiles of Web of Science Publications</title>
+    
+<!-- https://github.com/mholt/PapaParse-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.2.0/papaparse.min.js"></script>	
+<!-- // https://github.com/eligrey/FileSaver.js-->
+<script src="https://cdn.jsdelivr.net/g/filesaver.js"></script> 
+<script src="namedict.js"></script>
+<script src="addresslist.js"></script>
+<script src="excludednames.js"></script>
+<script src="excludeddepts.js"></script>
+</head>
+<body>
+
+<label for="csvfile">Select output file from wos2q</label>
+<input type="file" id="csvfile" name="Csv File">
+<button id="readBtn" onclick="readFunction()">Read</button> <br/><br/>
+Publications: <br/>
+<textarea rows = "30" cols = "120" name = "Publications" wrap="off" id="publicationsArea"></textarea> 
+<br/><label id = "infoTextFile" ></label> <label id = "infoTextOutput" ></label><br/>
+<button id="convBtn" onclick="convertFunction()">Convert</button> 	
+<button id="copyBtn" disabled onclick="copyFunction()">Copy</button>
+<button id="saveCsvBtn" disabled onclick="saveCsvFunction()">Save csv</button>
+<button id="saveDeptBtn" disabled onclick="saveDeptFunction()">Save dropped departments</button>
+<button id="saveNameBtn" disabled onclick="saveNameFunction()">Save dropped names</button>
+<button id="saveDupBtn" disabled onclick="saveDupFunction()">Save dropped addresses</button>
+&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;
+<br/>
+Document Types  <br/>
+WOS #
+<input type="text" name="WOSnumber" id="WOSnumber"> 
+<button id="gotoWOS" onclick="displayWOSdocument()">Show article</button>
+<button id="deleteWOSnumber" onclick="deleteWOSnumber()">Delete WOS #</button>
+<script>
+// global scope
+var csvtext="";
+var depttext=""; // rows dropped by excludeddepts.js, saved by saveDeptFunction for manual review
+var nametext=""; // rows dropped by excludednames.js, saved by saveNameFunction for manual review
+var duptext=""; // kept and dropped rows of authors with several rows on one publication, saved by saveDupFunction
+var delimit='\t'; // =document.getElementById('delimitValue').value
+const parseError = 'Please check "Include addresses box" on wos2q tool'
+
+// Every case conversion in this file goes through lower(). A Turkish locale maps I to the
+// dotless i, which would stop "Baskent Univ, Inst Hlth Sci" matching and silently put 14 rows
+// back into the output. js toLowerCase() is locale independent, toLocaleLowerCase() is not,
+// so never use that one here. Other languages differ: Python str.lower() is safe, but
+// java String.toLowerCase() and .NET ToLower() follow the system locale and need
+// Locale.ROOT / ToLowerInvariant. If this code is ported, lower() is the only place to fix.
+function lower(s) {
+	return s.toLowerCase();
+}
+if (lower('I') !== 'i') // fail loudly, a silent mismatch looks like a correct result
+	alert('Case conversion is locale sensitive here, address and department matching will be wrong.');
+
+function isHomeAddress(s) { // s contains one of addresslist.js entries, a relevant (home) institute
+	let ls = lower(s);
+	for (var h=0; h<addressList.length; h++)
+		if (ls.includes(lower(addressList[h])))
+			return true;
+	return false;
+}
+
+// columns copied from the wos2q file, in output order, after NS, Author name and Author address
+const outFields = ['Q','scie','ssci','ahci','esci','istp','isshp','bsci','bhci','Method','Wos number','Doc type',
+	'Cited','Auth.#','p.Year','ea.Year','Year','Journal','issn','eissn','isbn','Title','Doi','Vol.','Issue',
+	'Page.S','Page.E','Artic.Nr','Ref.style','PMID','Pub type','Publisher','Book doi','wosL','doiL','PMIDL',
+	'Authors','RID','OID'];
+
+function quote(v) { // RFC 4180: wrap in quotes, double any quote inside. a bare leading quote makes excel merge rows
+	return '"' + String(v ?? '').replace(/"/g, '""') + '"';
+}
+
+const BOM = '﻿'; // tells excel the file is UTF-8, otherwise turkish characters are garbled
+
+function deleteWOSnumber() {
+	document.getElementById('WOSnumber').value = "";
+}
+
+function displayWOSdocument() {
+var	w=document.getElementById('WOSnumber').value.replace("WOS:","").replace(" ","");
+var	urlText ="https://www.webofscience.com/wos/woscc/full-record/"+"WOS:"+w;
+	window.open(urlText,"_blank");
+	}
+function readFunction() {
+var file = document.getElementById('csvfile').files[0]; //get filename
+if (file === undefined)
+	return; // no file selected, leave the buttons as they are
+document.getElementById('publicationsArea').value=''; // clear textarea
+document.getElementById('copyBtn').disabled = true;  // disable copy button
+document.getElementById('convBtn').disabled = true;  // disable convert button
+document.getElementById('saveCsvBtn').disabled = true;  // disable save button
+document.getElementById('saveDeptBtn').disabled = true;  // disable save dropped button
+document.getElementById('saveNameBtn').disabled = true;  // disable save dropped names button
+document.getElementById('saveDupBtn').disabled = true;  // disable save dropped addresses button
+document.getElementById('readBtn').disabled = true;  // disable read button
+var reader = new FileReader(); // html5 
+	reader.onload = (function(file) {
+	return function(e) {
+	csvtext = this.result;	//read from csv file
+		document.getElementById('publicationsArea').value=csvtext; // show in textarea
+		document.getElementById('convBtn').disabled = false;  // enable convert button
+		document.getElementById('readBtn').disabled = false;  // enable read button
+		document.getElementById('infoTextFile').innerHTML = ''; // delete any previous information about row counts
+		document.getElementById('infoTextOutput').innerHTML = ''; // delete any previous information about row counts		
+           }
+		})(file);
+		reader.readAsText(file);
+}
+function convertFunction() {
+csvtext=document.getElementById('publicationsArea').value;
+if (csvtext.substr(0,2) == 'NS')
+		return; // already converted
+var pubtext=['NS','Author name','Author address'].concat(outFields).join(delimit)+'\n'; // header left unquoted, the 'NS' test above reads it
+
+depttext = pubtext; // rows dropped by excludeddepts.js, same header and same columns, for manual review
+nametext = pubtext; // rows dropped by excludednames.js, same header and same columns, for manual review
+
+var addresses="";
+var department = "";
+var author = []; // a group of authors sharing same addresses
+var addressOfAuthor ='';
+var atLeastOneAddress=false;
+var weird = ''; // '*' marks a record whose addresses or authors are not in the usual format
+var reprintAddress = '';
+var authors, allAdresses, tempAuthor, tempAddresses;
+var nauthor = 0; // number of authors
+var seenAuthors = new Set(); // author+address already emitted for the current publication
+var excludedSet = new Set(excludedNames); // second pass filter, see excludednames.js
+var protectedSet = new Set(protectedNames); // medical faculty never dropped by department, see excludeddepts.js
+var ndup = 0; // number of duplicate rows skipped
+var nexcluded = 0; // number of rows dropped by the second pass filter
+var ndept = 0; // number of rows dropped by the department filter
+var acceptedNames = new Map(); // author name -> its group, authors already in the output for the current publication
+var dupGroups = []; // groups that dropped at least one row, written to dropped-addresses.csv
+var nnamedup = 0; // number of rows dropped because the author already has a row on this publication
+document.getElementById('publicationsArea').value=""; // clear textarea
+document.getElementById('copyBtn').disabled = true;  // disable copy button
+document.getElementById('saveCsvBtn').disabled = true;  // disable save button
+document.getElementById('saveDeptBtn').disabled = true;  // disable save dropped button
+document.getElementById('saveNameBtn').disabled = true;  // disable save dropped names button
+document.getElementById('saveDupBtn').disabled = true;  // disable save dropped addresses button
+document.getElementById('convBtn').disabled = true;  // disable convert button
+document.getElementById('readBtn').disabled = true;  // disable read button
+var	results = Papa.parse(csvtext, {	//parse from csv text
+	header: true,
+	delimiter: delimit,  
+	fastMode: true,   // for not to delete quoted parts in "Aricle Title"
+	skipEmptyLines: true
+});
+var nrows = results.data.length; // number of rows in csv file
+document.getElementById('infoTextFile').innerHTML = 'Number of publications in the csv file = '+nrows+'.';
+for (var i=0; i<nrows; i++) { // for each publication
+	atLeastOneAddress = false;
+	seenAuthors.clear(); // duplicates are only duplicates within the same publication
+	acceptedNames.clear();
+	reprintAddress=results.data[i]['Correspondence']//['Reprint Addresses'];
+
+	weird = '' // assume each article in shape of normal address format and author format
+
+	addresses = results.data[i]['Addresses'] //Addresses // deal with this text
+	if (addresses === undefined ) {
+	document.getElementById('publicationsArea').value = parseError;
+	document.getElementById('convBtn').disabled = false;  // re-enable convert button, otherwise the user is stuck
+	document.getElementById('readBtn').disabled = false;  // re-enable read button, so a corrected file can be loaded
+	return;
+	}
+	if (addresses == '') { // if Addresses field is empty
+		addresses = '[' + results.data[i]['Authors'] + '] ' +'Unknown'; // ['Authors']
+		weird = '*'  // check output 
+		}
+	if (addresses.indexOf("[")==-1) { // if Addresses field doesn't contain names
+
+		tempAuthor = results.data[i]['Authors'].replace(/;/g, ' -') // regexp for all // ['Authors']
+			// print only relevant (home institute) addresses
+		allAdresses = addresses.split(";")
+		tempAddresses = ""
+		for (var c=0; c<allAdresses.length; c++) {
+			if (isHomeAddress(allAdresses[c])) // a relevant address (home institute), added once
+				tempAddresses = tempAddresses + allAdresses[c].trim() + " - ";
+		}
+		tempAddresses = tempAddresses.slice (0, -3); // remove last " - "
+	//	tempAddresses = addresses.replace(/;/g, '-') //regexp for all
+		weird = '*'  // someting weird in Addresses column, check them by marking with (*)
+		addresses = '['+tempAuthor+'] '+ tempAddresses
+		}
+	if (addresses.substring(0,1) != '[' ) {// if Addresses field doesn't start with [
+		addresses ='[unknown] ' + addresses
+		weird = '*' // someting weird in Addresses column, check them by marking with (*)
+		}
+	authors = addresses.slice(1).split("; [") //delete [, then go to first author of next address
+	
+	for (var j=0;j<authors.length;j++) { // for each address
+	department = authors[j].split ("] ") // department[0] contains authors, department[1] contains address
+	author = department[0].split ("; ") //
+	if (department[1] === undefined) {
+	department[1] = addressList[0]+'?';  // one of authors seems to be in address list
+	weird = '*'; // someting weird in Addresses column, check them by marking with (*)
+	}
+	addressOfAuthor=department[1];
+	if (isHomeAddress(addressOfAuthor)) { // current address is in the addresses list, a relevant (home) institute
+	atLeastOneAddress=true;
+	addRow();
+		}
+	} // for each address
+	if ((atLeastOneAddress == false) && (reprintAddress !=='') ) { // didn't find a suitable address, check for reprint Address
+		// "Name1 (corresponding author), Address1; Name2 (corresponding author), Address2". split on the tag,
+		// every middle piece is "Address; NextName", the next name follows its last "; ".
+		// the same author may be listed twice, with another university first, so each pair is tested
+		let pieces = reprintAddress.split(' (corresponding author), ');
+		let reprintNames = [pieces[0]], reprintAddrs = [];
+		for (var r=1; r<pieces.length; r++) {
+			let cut = pieces[r].lastIndexOf('; ');
+			if ((r == pieces.length-1) || (cut == -1))
+				cut = pieces[r].length; // the last piece is all address
+			reprintAddrs.push(pieces[r].slice(0, cut));
+			reprintNames.push(pieces[r].slice(cut+2));
+			}
+		for (var r=0; r<reprintAddrs.length; r++) { // no tag at all leaves this empty, nothing to add
+			if ((reprintNames[r] === '') || !isHomeAddress(reprintAddrs[r]))
+				continue;
+			author = [reprintNames[r]];
+			addressOfAuthor = reprintAddrs[r];
+			addRow(); // an author listed twice with a home address is caught by the duplicate filter
+			}
+		}
+} // for each publication
+function addRow () { // if Address is in the Addresses list
+	// department filter, see excludeddepts.js. the address is shared by every author of this group,
+	// so test it once here. a weird ('*') row is never filtered, its address may be wrong
+	let addressExcluded = false;
+	if (weird === '') {
+		let institutes = lower(addressOfAuthor).split("; "); // a correspondence address can hold several
+		for (var p=0; p<institutes.length && !addressExcluded; p++) {
+			if (!isHomeAddress(institutes[p]))
+				continue; // another university's department is not ours to exclude
+			for (var e=0; e<excludedDepartments.length; e++) {
+				if (institutes[p].includes(lower(excludedDepartments[e]))) {
+					addressExcluded = true;
+					break; }
+				}
+			}
+		}
+		for (var k=0;k<author.length;k++) { // for each author
+			for (var c=0; c<nameDict.length; c+=2) { // nameDict pairs are "Correct name","Variation"
+				if ( author[k]==nameDict[c+1]) {  // if author name is a known variation, then correct it
+					author[k]=nameDict[c]
+					break; } // don't continue to search
+				}
+			// wos sometimes repeats the same author, or the same [authors] address group, in one record
+			let dupKey = author[k]+'\t'+addressOfAuthor;
+			if (seenAuthors.has(dupKey)) {
+				ndup++;
+				continue; } // this author already has a row with this address for this publication
+			seenAuthors.add(dupKey);
+				let row = [weird, author[k], addressOfAuthor] // NS, name of author, address of author
+					.concat(outFields.map(f => results.data[i][f]))
+					.map(quote).join(delimit)+'\n';
+			// second pass filter: drop excluded names, but only from cleanly extracted rows.
+			// a weird ('*') row is left alone, its name may be wrong so excluding it could be a mistake.
+			// the whole row is kept aside, the "Save dropped names" button writes it out for manual review
+			if ((weird === '') && excludedSet.has(author[k])) {
+				nexcluded++;
+				nametext = nametext+row;
+				continue; } // this author is in excludednames.js
+			// drop an excluded department, unless this author is medical faculty attending a Ph.D. there.
+			// the whole row is kept aside, the "Save dropped" button writes it out for manual review
+			if (addressExcluded && !protectedSet.has(author[k])) {
+				ndept++;
+				depttext = depttext+row;
+				continue; } // address is in excludeddepts.js and author is not in protectedNames
+			// one row per author per publication, the address is not compared. tested last, so only rows that
+			// reach the output count: a first address dropped above does not hide a valid second one.
+			// a weird ('*') row is never dropped here, its name may be an author list or misparsed
+			if (weird === '') {
+				let g = acceptedNames.get(author[k]);
+				if (g !== undefined) {
+					if (g.removed.length === 0)
+						dupGroups.push(g); // first dropped row of this author on this publication
+					g.removed.push(row);
+					nnamedup++;
+					continue; } // this author already has a row on this publication
+				acceptedNames.set(author[k], {name: author[k], wos: results.data[i]['Wos number'], kept: row, removed: []});
+				}
+			pubtext = pubtext+row;
+			nauthor++;
+			}
+} // if Address is in the Addresses list
+
+// dropped-addresses.csv: every kept and dropped row of the same author on one publication, sorted by name then
+// wos number, so each group sits together. Group and Action (kept/removed) columns come first
+dupGroups.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : a.wos < b.wos ? -1 : a.wos > b.wos ? 1 : 0);
+duptext = ['Group','Action','NS','Author name','Author address'].concat(outFields).join(delimit)+'\n';
+for (var g=0; g<dupGroups.length; g++) {
+	duptext = duptext+quote(g+1)+delimit+quote('kept')+delimit+dupGroups[g].kept;
+	for (var d=0; d<dupGroups[g].removed.length; d++)
+		duptext = duptext+quote(g+1)+delimit+quote('removed')+delimit+dupGroups[g].removed[d];
+	}
+
+document.getElementById('publicationsArea').value=pubtext;
+document.getElementById('copyBtn').disabled = false; // enable copy button
+document.getElementById('saveCsvBtn').disabled = false;  // enable save button
+document.getElementById('saveDeptBtn').disabled = (ndept === 0);  // nothing to review if nothing was dropped
+document.getElementById('saveNameBtn').disabled = (nexcluded === 0);  // nothing to review if nothing was dropped
+document.getElementById('saveDupBtn').disabled = (nnamedup === 0);  // nothing to review if nothing was dropped
+document.getElementById('convBtn').disabled = false;  // enable convert button
+document.getElementById('readBtn').disabled = false;  // enable read button
+document.getElementById('infoTextOutput').innerHTML = 'Number of authors/publications in output = '+nauthor+'. Duplicates skipped = '+ndup+'. Excluded names skipped = '+nexcluded+'. Excluded departments skipped = '+ndept+'. Dropped addresses (author already on the publication) = '+nnamedup+' (in '+dupGroups.length+' groups).';
+}
+function copyFunction() {
+	document.getElementById('publicationsArea').select();
+	document.execCommand("copy");
+	document.getElementById('convBtn').disabled = false;  // enable convert button
+}
+function saveDeptFunction() { // rows dropped by excludeddepts.js, all fields, to be reviewed manually
+var blob = new Blob([BOM+depttext],
+                { type: "text/plain;charset=utf-8" });
+saveAs(blob, "dropped-departments.csv", true); // true: BOM is added above, stop FileSaver adding a second one
+	document.getElementById('convBtn').disabled = false;  // enable convert button
+}
+function saveNameFunction() { // rows dropped by excludednames.js, all fields, to be reviewed manually
+var blob = new Blob([BOM+nametext],
+                { type: "text/plain;charset=utf-8" });
+saveAs(blob, "dropped-names.csv", true); // true: BOM is added above, stop FileSaver adding a second one
+	document.getElementById('convBtn').disabled = false;  // enable convert button
+}
+function saveDupFunction() { // kept and dropped rows of authors with several rows on one publication, to be reviewed manually
+var blob = new Blob([BOM+duptext],
+                { type: "text/plain;charset=utf-8" });
+saveAs(blob, "dropped-addresses.csv", true); // true: BOM is added above, stop FileSaver adding a second one
+	document.getElementById('convBtn').disabled = false;  // enable convert button
+}
+function saveCsvFunction() {
+var blob = new Blob([BOM+document.getElementById('publicationsArea').value],
+                { type: "text/plain;charset=utf-8" });
+saveAs(blob, "output.csv", true); // true: BOM is added above, stop FileSaver adding a second one
+	document.getElementById('convBtn').disabled = false;  // enable convert button
+}
+</script>
+</body>
+</html>

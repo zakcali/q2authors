@@ -1,0 +1,37 @@
+# q2authors: only the program, the scripts, README.md and the data files go into the repository.
+# web of science data (the input and everything made from it) is licensed and large, it stays local.
+
+# input and outputs: the wos2q export, output.csv, dropped-*.csv, name-review.csv, ...
+*.csv
+*.tsv
+*.txt
+*.xlsx
+*.xls
+
+# hand-made and final files of the merge step (resolved-addresses.csv, missed-publications.csv,
+# merged-output.csv, author-counts.csv). the two hand-made files are kept as header-only templates,
+# so merge.py runs on a fresh copy. never commit them with real rows, they hold web of science data
+merge/*
+!merge/resolved-addresses.csv
+!merge/missed-publications.csv
+
+# old versions and notes
+eski/
+
+# backups and editor leftovers
+*.bak
+*.zip
+*.rar
+*~
+.~lock.*
+
+# python and tools
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+.claude/
+
+# to keep the list of excluded colleagues private, remove the # below. index.html then needs a local
+# excludednames.js to run, anyone else can start from: let excludedNames= [ ];
+# excludednames.js

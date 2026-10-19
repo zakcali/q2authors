@@ -11,6 +11,7 @@ let excludedNames= [ // names dropped from cleanly extracted rows only (NS colum
 "Bayram, Burak",
 "Bayram, Sinem",
 "Beyaz, Esra Koseler",
+"Basgut, Bilgen",
 "Bulut, Sule",
 "Caglar, Yigit",
 "Cetin, Mehtap Bilgin",

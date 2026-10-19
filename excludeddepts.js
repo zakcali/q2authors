@@ -18,6 +18,10 @@ let excludedDepartments= [ // matched case-insensitively ANYWHERE in a home-inst
 "Ind Engn",
 "Bilgisayar Muhendisligi",
 "Muhendislik Fak",
+"Clin Pharm & Drug Informat Ctr",
+"Fac Pharm",
+"Gida Tarim & Hayvanciligi Gelistirme Enstitusu",
+"Fen Edebiyat Fak",
 // Dental entries match the DEPARTMENT, never "Fac Dent". Wos sometimes prints "Fac Dent" on a
 // medical record (e.g. "Fac Dent, Dept Thorac Surg") and sometimes prints "Fac Med" on a dental
 // one (e.g. "Fac Med, Dept Periodontol"), so the department is the field that can be trusted.

@@ -20,6 +20,7 @@ let excludedDepartments= [ // matched case-insensitively ANYWHERE in a home-inst
 "Muhendislik Fak",
 "Clin Pharm & Drug Informat Ctr",
 "Fac Pharm",
+"Sch Pharm",
 "Gida Tarim & Hayvanciligi Gelistirme Enstitusu",
 "Fen Edebiyat Fak",
 // Dental entries match the DEPARTMENT, never "Fac Dent". Wos sometimes prints "Fac Dent" on a

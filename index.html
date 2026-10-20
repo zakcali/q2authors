@@ -51,6 +51,11 @@ added $ISTP,$ISSHP,$BSCI,$BHCI,isbn,$pubType, $publisher, $bookDoi-->
    wrong. new "Save dropped addresses" button writes dropped-addresses.csv: every kept and dropped row of such
    an author, sorted by name and wos number, with Group and Action (kept/removed) columns in front.
    distinct wos counts per author do not change, only the row count-->
+<!-- new namedict-addresses.js resolves a short name that fits several people (Haberal, M. = Mehmet or
+   Kemal Murat) by a word in the row's address (Gen Surg -> Mehmet, Radiol -> Kemal Murat). applied right
+   after namedict.js, before every filter, so the filters see the real name. clean rows only, and only when
+   the address matches exactly one entry, otherwise the short name stays. an entry's optional wos list holds
+   publications checked by hand, on those the entry wins whatever the address-->
 
 <html>
 <head>
@@ -65,6 +70,7 @@ added $ISTP,$ISSHP,$BSCI,$BHCI,isbn,$pubType, $publisher, $bookDoi-->
 <script src="addresslist.js"></script>
 <script src="excludednames.js"></script>
 <script src="excludeddepts.js"></script>
+<script src="namedict-addresses.js"></script>
 </head>
 <body>
 
@@ -189,6 +195,7 @@ var ndept = 0; // number of rows dropped by the department filter
 var acceptedNames = new Map(); // author name -> its group, authors already in the output for the current publication
 var dupGroups = []; // groups that dropped at least one row, written to dropped-addresses.csv
 var nnamedup = 0; // number of rows dropped because the author already has a row on this publication
+var nresolved = 0; // number of short names resolved by namedict-addresses.js
 document.getElementById('publicationsArea').value=""; // clear textarea
 document.getElementById('copyBtn').disabled = true;  // disable copy button
 document.getElementById('saveCsvBtn').disabled = true;  // disable save button
@@ -302,6 +309,29 @@ function addRow () { // if Address is in the Addresses list
 					author[k]=nameDict[c]
 					break; } // don't continue to search
 				}
+			// a short name that fits several people (Haberal, M.) is resolved by the address, see namedict-addresses.js.
+			// clean rows only, a weird ('*') row may carry a wrong name or address. renamed only when exactly one
+			// person's words are in the address, an address matching two people or none keeps the short name
+			// a publication listed in an entry's wos was checked by hand, that entry wins whatever the address
+			if (weird === '') {
+				let laddress = lower(addressOfAuthor);
+				let wosNumber = results.data[i]['Wos number'];
+				let fits = new Set(), byWos = new Set();
+				for (var e=0; e<nameDictAddresses.length; e++) {
+					let entry = nameDictAddresses[e];
+					if (!entry.shortnames.includes(author[k]))
+						continue;
+					if ((entry.wos || []).includes(wosNumber))
+						byWos.add(entry.name);
+					if (entry.addresses.some(a => laddress.includes(lower(a))))
+						fits.add(entry.name);
+					}
+				if (byWos.size > 0)
+					fits = byWos; // two entries claiming one publication fit both, and the short name stays
+				if (fits.size === 1) {
+					author[k] = [...fits][0];
+					nresolved++; }
+				}
 			// wos sometimes repeats the same author, or the same [authors] address group, in one record
 			let dupKey = author[k]+'\t'+addressOfAuthor;
 			if (seenAuthors.has(dupKey)) {
@@ -360,7 +390,7 @@ document.getElementById('saveNameBtn').disabled = (nexcluded === 0);  // nothing
 document.getElementById('saveDupBtn').disabled = (nnamedup === 0);  // nothing to review if nothing was dropped
 document.getElementById('convBtn').disabled = false;  // enable convert button
 document.getElementById('readBtn').disabled = false;  // enable read button
-document.getElementById('infoTextOutput').innerHTML = 'Number of authors/publications in output = '+nauthor+'. Duplicates skipped = '+ndup+'. Excluded names skipped = '+nexcluded+'. Excluded departments skipped = '+ndept+'. Dropped addresses (author already on the publication) = '+nnamedup+' (in '+dupGroups.length+' groups).';
+document.getElementById('infoTextOutput').innerHTML = 'Number of authors/publications in output = '+nauthor+'. Duplicates skipped = '+ndup+'. Excluded names skipped = '+nexcluded+'. Excluded departments skipped = '+ndept+'. Dropped addresses (author already on the publication) = '+nnamedup+' (in '+dupGroups.length+' groups). Short names resolved by address = '+nresolved+'.';
 }
 function copyFunction() {
 	document.getElementById('publicationsArea').select();

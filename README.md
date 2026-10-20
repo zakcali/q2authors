@@ -34,7 +34,10 @@ If the browser saves `output (1).csv`, an older `output.csv` was still in the fo
 1. **Finds the home-institution addresses.** An address counts when it contains one of the strings in
    `addresslist.js` (case-insensitive). If no `Addresses` entry matches, the `Correspondence` address is tried.
 2. **Splits the address groups into authors.** `[Author A; Author B] Address` gives one row per author.
-3. **Corrects the name** with `namedict.js` (exact match on a variation → its correct name).
+3. **Corrects the name** with `namedict.js` (exact match on a variation → its correct name). Then, for a short
+   name that fits several people (`Haberal, M.`), `namedict-addresses.js` picks the person by a word in the
+   row's address (`Gen Surg` → Mehmet, `Radiol` → Kemal Murat). Only when exactly one person fits, and never on
+   a `*` row; otherwise the short name stays.
 4. **Drops exact repeats** (same corrected name + same address in one record; WOS sometimes repeats them).
 5. **Drops excluded names** (`excludednames.js`) → `dropped-names.csv`.
 6. **Drops excluded departments** (`excludeddepts.js`), unless the author is in `protectedNames`
@@ -68,13 +71,14 @@ else's publication. Resolve them by hand (see `resolved-addresses.csv` below). `
 
 ### Data files (edit these by hand)
 
-All four are JavaScript, so **every line needs its comma** and every name its quotes. A missing comma stops the
+All five are JavaScript, so **every line needs its comma** and every name its quotes. A missing comma stops the
 whole page. Check after editing with `node --check namedict.js` (or the other file name).
 
 | File | Contains | Format |
 |---|---|---|
 | `addresslist.js` | Strings that mark a home-institution address, including WOS misspellings (`baflkent univ`, `bapkent univ`, …). | `"baskent univ",` |
 | `namedict.js` | Name corrections: spelling variants and short forms → one correct name. The first matching line wins. | `"Correct name","Variation",` |
+| `namedict-addresses.js` | Short names shared by several people, resolved by a word in the address. Applied after `namedict.js`. | `{name: "Haberal, Mehmet", shortnames: ["Haberal, M."], addresses: ["Gen Surg"]},` |
 | `excludednames.js` | Authors who are not counted (not medical faculty). Applies after correction. | `"Surname, Name",` |
 | `excludeddepts.js` | `excludedDepartments`: matched anywhere in a home address. `protectedNames`: authors never dropped by department. | `"Comp Engn",` |
 
@@ -83,7 +87,13 @@ Rules learned the hard way:
 - **`namedict.js`: the correct name comes first.** `"Savas, N. A.","Savas, Nurten Akyurek",` is reversed and
   turns the full name into the short form.
 - **Do not map a single initial to the most common author.** Many authors use their middle name:
-  `Haberal, M.` could be *Mehmet* or *Kemal Murat*, so it stays unmerged on purpose.
+  `Haberal, M.` could be *Mehmet* or *Kemal Murat*, so it stays out of `namedict.js` on purpose and is
+  resolved by address in `namedict-addresses.js` instead.
+- **`namedict-addresses.js`: a wrong address match is fixed with `wos`.** An entry's optional
+  `wos: ["WOS:…"]` list holds publications checked by hand; on those the entry wins whatever the address
+  (e.g. two 2008 `Dept Radiol` papers that are Mehmet Haberal's, not Kemal Murat's).
+- **`namedict-addresses.js`: lists use square brackets.** `addresses: ["Gen Surg", "Radiol"]`, not curly ones,
+  and every entry ends with `},`.
 - **Departments, not faculties, in `excludeddepts.js`.** WOS prints `Fac Dent` or `Fac Engn` on some medical
   records (`Fac Engn, Dept Pathol`), so match the department (`Periodontol`, `Comp Engn`). When a faculty-level
   entry such as `Fac Eng` is used anyway, put the medical authors it catches into `protectedNames`.

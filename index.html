@@ -390,7 +390,9 @@ document.getElementById('saveNameBtn').disabled = (nexcluded === 0);  // nothing
 document.getElementById('saveDupBtn').disabled = (nnamedup === 0);  // nothing to review if nothing was dropped
 document.getElementById('convBtn').disabled = false;  // enable convert button
 document.getElementById('readBtn').disabled = false;  // enable read button
-document.getElementById('infoTextOutput').innerHTML = 'Number of authors/publications in output = '+nauthor+'. Duplicates skipped = '+ndup+'. Excluded names skipped = '+nexcluded+'. Excluded departments skipped = '+ndept+'. Dropped addresses (author already on the publication) = '+nnamedup+' (in '+dupGroups.length+' groups). Short names resolved by address = '+nresolved+'.';
+document.getElementById('infoTextOutput').innerHTML = 'Number of authors/publications in output = '+nauthor+'.' // follows the publication count on the first line
+	+'<br/>Duplicates skipped = '+ndup+'. Excluded names skipped = '+nexcluded+'. Excluded departments skipped = '+ndept+'.'
+	+'<br/>Dropped addresses (author already on the publication) = '+nnamedup+' (in '+dupGroups.length+' groups). Short names resolved by address = '+nresolved+'.';
 }
 function copyFunction() {
 	document.getElementById('publicationsArea').select();

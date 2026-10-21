@@ -3,6 +3,8 @@ let nameDictAddresses= [ // a short name that fits several people, resolved by a
 // matches exactly one entry: an address matching two people, or none, keeps the short name.
 // words are matched case-insensitively anywhere in the address, like excludeddepts.js
 // wos (optional): publications checked by hand. the short name on these is this person, whatever the address
+// journal (optional): whole journal names, case-insensitive. counts like an address word (VALUE IN HEALTH)
+// addresses (optional): an entry may use only wos and journal
 // {name: "", shortnames: [""], addresses: [""]},
 {name: "Haberal, Mehmet",      shortnames: ["Haberal, M", "Haberal, M."], addresses: ["Transplant", "Gen Surg", "Dept Surg"],
 	wos: ["WOS:000252037900055", "WOS:000252037900066"]}, // 2008, Dept Radiol address
@@ -10,8 +12,8 @@ let nameDictAddresses= [ // a short name that fits several people, resolved by a
 {name: "Onal, Cem", shortnames: ["Onal, C.", "Onal, H."], addresses: ["Radiat Oncol", "Adana"],
         wos: ["WOS:000892639300510", "WOS:000892639300509", "WOS:000892639300167", "WOS:000892639300511", "WOS:000489290100040", "WOS:000892639300451"]},
 {name: "Arslan, Gulnaz", shortnames: ["Arslan, G."], addresses: ["Anesthesiol"]},
-{name: "Oksuz, Ergun", shortnames: ["Oksuz, E."], addresses: ["Family Med"]},
-{name: "Colak, Turan", shortnames: ["Colak, T."], addresses: ["Nephrol"]},
+{name: "Oksuz, Ergun", shortnames: ["Oksuz, E."], addresses: ["Family Med"], wos: ["WOS:000644681000004", "WOS:000303905800010"], journal: ["VALUE IN HEALTH"]},
+{name: "Colak, Turan", shortnames: ["Colak, T."], addresses: ["Nephrol"], wos: ["WOS:000857046602282", "WOS:000857046602283"], journal: ["TRANSPLANTATION", "AMERICAN JOURNAL OF TRANSPLANTATION"]},
 {name: "Yildirir, Aylin", shortnames: ["Yildirir, A."], addresses: ["Cardiol"]},
 {name: "Torun, Nese", shortnames: ["Torun, N."], addresses: ["Nucl Med"]},
 {name: "Dursun, Polat", shortnames: ["Dursun, P."], addresses: ["Obstet & Gynecol"]},

@@ -92,6 +92,9 @@ Rules learned the hard way:
 - **`namedict-addresses.js`: a wrong address match is fixed with `wos`.** An entry's optional
   `wos: ["WOS:…"]` list holds publications checked by hand; on those the entry wins whatever the address
   (e.g. two 2008 `Dept Radiol` papers that are Mehmet Haberal's, not Kemal Murat's).
+- **`namedict-addresses.js`: `journal` works like an address word.** `journal: ["VALUE IN HEALTH"]` matches the
+  whole journal name, case-insensitive. Useful when the addresses name no department but the journal is typical
+  of one person. `addresses`, `wos` and `journal` are all optional.
 - **`namedict-addresses.js`: lists use square brackets.** `addresses: ["Gen Surg", "Radiol"]`, not curly ones,
   and every entry ends with `},`.
 - **Departments, not faculties, in `excludeddepts.js`.** WOS prints `Fac Dent` or `Fac Engn` on some medical

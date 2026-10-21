@@ -55,7 +55,8 @@ added $ISTP,$ISSHP,$BSCI,$BHCI,isbn,$pubType, $publisher, $bookDoi-->
    Kemal Murat) by a word in the row's address (Gen Surg -> Mehmet, Radiol -> Kemal Murat). applied right
    after namedict.js, before every filter, so the filters see the real name. clean rows only, and only when
    the address matches exactly one entry, otherwise the short name stays. an entry's optional wos list holds
-   publications checked by hand, on those the entry wins whatever the address-->
+   publications checked by hand, on those the entry wins whatever the address. an entry's optional journal
+   list works like an address word: the whole journal name, case-insensitive-->
 
 <html>
 <head>
@@ -316,6 +317,7 @@ function addRow () { // if Address is in the Addresses list
 			if (weird === '') {
 				let laddress = lower(addressOfAuthor);
 				let wosNumber = results.data[i]['Wos number'];
+				let journal = lower((results.data[i]['Journal'] ?? '').trim());
 				let fits = new Set(), byWos = new Set();
 				for (var e=0; e<nameDictAddresses.length; e++) {
 					let entry = nameDictAddresses[e];
@@ -323,7 +325,9 @@ function addRow () { // if Address is in the Addresses list
 						continue;
 					if ((entry.wos || []).includes(wosNumber))
 						byWos.add(entry.name);
-					if (entry.addresses.some(a => laddress.includes(lower(a))))
+					// an address word anywhere in the address, or the journal's whole name. both fields are optional
+					if ((entry.addresses || []).some(a => laddress.includes(lower(a))) ||
+						(entry.journal || []).some(j => lower(j.trim()) === journal))
 						fits.add(entry.name);
 					}
 				if (byWos.size > 0)

@@ -150,6 +150,7 @@ let nameDict= [ // pairs: "Correct name","Variation"
 "Aydingoz, Selda Emre","Emre Aydingoz, Selda",
 "Aydingoz, Selda Emre","Emre-Aydingoz, Selda",
 "Aydogan, Cem","Aydogan, C.",
+"Ayhan, Ali","Ayhan, All",
 "Aytac, Huseyin Ozgur","Ayta, Huseyin Ozgur",
 "Aytac, Huseyin Ozgur","Aytac, H. O.",
 "Aytac, Huseyin Ozgur","Aytac, H. Ozgur",
